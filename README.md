@@ -19,25 +19,28 @@ Or install it yourself as:
 ## Usage
 
     lexer = SrcLexer::Lexer.new(
-      ['struct', 'enum'], # kyewords
-      ['{', '}', ',', '=', ';'], # symbols
+      ['struct', 'enum', 'true', 'false'], # kyewords
+      ['{', '}', '(', ')', ',', '==', '=', ';'], # symbols
       ['"', '"'], # string literal markers
       '//', # line comment marker
       ['/*', '*/'] # multi line comment markers
     )
+    
     lexer.analyze(<<-'EOS')
       // comment
       enum ID {
         First = 1,
         Second = 1.5
       }
-			 /* comment
-			    againe */
+      /* comment
+         againe */
       struct Data {
         string name = "This is a name.";
         ID id;
       }
+      bool b = (true==false);
     EOS
+    
     lexer.pop_token # => ['enum', SrcLexer::Token.new('enum', 2, 3)]
     lexer.pop_token # => [:IDENT, SrcLexer::Token.new('ID', 2, 8)]
     lexer.pop_token # => ['{', SrcLexer::Token.new('{', 2, 11)]
@@ -61,6 +64,15 @@ Or install it yourself as:
     lexer.pop_token # => [:IDENT, SrcLexer::Token.new('id', 10, 8)]
     lexer.pop_token # => [';', SrcLexer::Token.new(';', 10, 10)]
     lexer.pop_token # => ['}', SrcLexer::Token.new('}', 11, 3)]
+    lexer.pop_token # => [:IDENT, SrcLexer::Token.new('bool', 12, 3)]
+    lexer.pop_token # => [:IDENT, SrcLexer::Token.new('b', 12, 8)]
+    lexer.pop_token # => [:IDENT, SrcLexer::Token.new('=', 12, 10)]
+    lexer.pop_token # => ['(', SrcLexer::Token.new('(', 12, 12)]
+    lexer.pop_token # => ['true', SrcLexer::Token.new('true', 12, 13)]
+    lexer.pop_token # => ['==', SrcLexer::Token.new('==', 12, 17)]
+    lexer.pop_token # => ['false', SrcLexer::Token.new('==', 12, 19)]
+    lexer.pop_token # => [')', SrcLexer::Token.new('==', 12, 24)]
+    lexer.pop_token # => [';', SrcLexer::Token.new('==', 12, 25)]
     lexer.pop_token # => SrcLexer::Lexer::END_TOKEN
 
 ## Contributing
