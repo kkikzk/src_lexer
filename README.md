@@ -70,9 +70,9 @@ Or install it yourself as:
     lexer.pop_token # => ['(', SrcLexer::Token.new('(', 12, 12)]
     lexer.pop_token # => ['true', SrcLexer::Token.new('true', 12, 13)]
     lexer.pop_token # => ['==', SrcLexer::Token.new('==', 12, 17)]
-    lexer.pop_token # => ['false', SrcLexer::Token.new('==', 12, 19)]
-    lexer.pop_token # => [')', SrcLexer::Token.new('==', 12, 24)]
-    lexer.pop_token # => [';', SrcLexer::Token.new('==', 12, 25)]
+    lexer.pop_token # => ['false', SrcLexer::Token.new('false', 12, 19)]
+    lexer.pop_token # => [')', SrcLexer::Token.new(')', 12, 24)]
+    lexer.pop_token # => [';', SrcLexer::Token.new(';', 12, 25)]
     lexer.pop_token # => SrcLexer::Lexer::END_TOKEN
 
 ## Contributing
