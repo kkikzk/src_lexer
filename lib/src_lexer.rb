@@ -20,13 +20,14 @@ module SrcLexer
     END_TOKEN = [false, nil]
     NUMBER_REGEX = /^[\d]+[\.]?[\d]*\z/
     STRING_REGEX = /^\"(.*)\"\z/m
-    attr_reader :keywords, :symbols, :line_comment_marker, :comment_markers, :tokens, :str
+    attr_reader :keywords, :symbols, :string_literal_marker, :line_comment_marker, :comment_markers, :tokens, :str
 
-    def initialize(keywords, symbols, line_comment_marker, comment_marker)
-      @keywords = ((keywords.nil?) ? [] : keywords.uniq.compact)
-      @symbols = ((symbols.nil?) ? [] : symbols.uniq.compact)
-      @line_comment_marker = ((line_comment_marker.nil?) ? '' : line_comment_marker)
-      @comment_markers = ((comment_marker.nil?) ? ['', ''] : comment_marker)
+    def initialize(keywords, symbols, string_literal_marker, line_comment_marker, comment_markers)
+      @keywords = (keywords ? keywords.uniq.compact : [])
+      @symbols = (symbols ? symbols.uniq.compact : [])
+      @string_literal_marker = string_literal_marker
+      @line_comment_marker = line_comment_marker
+      @comment_markers = comment_markers
     end
 
     def analyze(str)
@@ -144,19 +145,19 @@ module SrcLexer
         if iterator.is_white_space then
           @tokens.push iterator.shift if iterator.marked?
           iterator.move_next
-        elsif iterator.is(@line_comment_marker) then
+        elsif @line_comment_marker && iterator.is(@line_comment_marker) then
           @tokens.push iterator.shift if iterator.marked?
           iterator.move_to_the_end_of_the_line
           iterator.move_next
-        elsif iterator.is(@comment_markers[0]) then
+        elsif @comment_markers && iterator.is(@comment_markers[0]) then
           @tokens.push iterator.shift if iterator.marked?
           iterator.move_to(@comment_markers[1])
           iterator.move_next
-        elsif iterator.is('"') then
+        elsif @string_literal_marker && iterator.is(@string_literal_marker[0]) then
           @tokens.push iterator.shift if iterator.marked?
           iterator.mark_set
           iterator.move_next
-          iterator.move_to('"')
+          iterator.move_to(@string_literal_marker[1])
           iterator.move_next
           @tokens.push iterator.shift
         elsif iterator.is_in(@symbols) then
@@ -175,6 +176,49 @@ module SrcLexer
 
     def is_reserved?(token)
       @keywords.include?(token) || @symbols.include?(token)
+    end
+  end
+
+  class CSharpLexer < Lexer
+    def initialize
+      super(
+        [ # C# keywords
+          'abstract',   'as',       'base',       'bool',      'break',
+          'byte',       'case',     'catch',      'char',      'checked',
+          'class',      'const',    'continue',   'decimal',   'default',
+          'delegate',   'do',       'double',     'else',      'enum',
+          'event',      'explicit', 'extern',     'false',     'finally',
+          'fixed',      'float',    'for',        'foreach',   'goto',
+          'if',         'implicit', 'in',         'int',       'interface',
+          'internal',   'is',       'lock',       'long',      'namespace',
+          'new',        'null',     'object',     'operator',  'out',
+          'override',   'params',   'private',    'protected', 'public',
+          'readonly',   'ref',      'return',     'sbyte',     'sealed',
+          'short',      'sizeof',   'stackalloc', 'static',    'string',
+          'struct',     'switch',   'this',       'throw',     'true',
+          'try',        'typeof',   'uint',       'ulong',     'unchecked',
+          'unsafe',     'ushort',   'using',      'virtual',   'void',
+          'volatile',   'while',
+          # C# context keywords
+          'add',        'alias',    'ascending',  'async',     'await',
+          'descending', 'dynamic',  'from',       'get',       'global',
+          'group',      'into',     'join',       'let',       'orderby',
+          'partial',    'remove',   'select',     'set',       'value',
+          'var',        'where',    'yield'
+        ],
+        [
+          '<<=', '>>=', '<<',  '>>',  '<=',
+          '>=',  '==',  '!=',  '&&',  '||',
+          '??',  '+=',  '-=',  '*=',  '/=',
+          '%=',  '&=',  '|=',  '^=',  '=>',
+          '*',   '/',   '%',   '+',   '-',
+          '<',   '>',   '&',   '^',   '|',
+          '?',   ':',   '=',   '{',   '}',
+          '(',   ')',   '[',   ']',   ';'
+        ],
+        ['"', '"'], # comment markers
+        '//', # line comment marker
+        ['/*', '*/']) # multi line comment markers
     end
   end
 end
