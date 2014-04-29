@@ -172,6 +172,8 @@ module SrcLexer
         end
       end
       @tokens.push iterator.shift if iterator.marked?
+      
+      return self
     end
 
     def is_reserved?(token)
