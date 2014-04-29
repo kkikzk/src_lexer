@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
   spec.email         = ["kkikzk@gmail.com"]
   spec.summary       = %q{A simple source file lexer}
   spec.description   = ""
-  spec.homepage      = ""
+  spec.homepage      = "https://github.com/kkikzk/src_lexer"
   spec.license       = "MIT"
 
   spec.files         = `git ls-files -z`.split("\x0")
