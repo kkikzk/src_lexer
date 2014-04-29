@@ -44,11 +44,11 @@ describe SrcLexer::Lexer, 'with symbol definitions' do
     sut.pop_token.should == SrcLexer::Lexer::END_TOKEN
   end
   it 'should recognize symbols(,) if continues like "A,B"' do
-    sut = SrcLexer::Lexer.new(nil, [','], nil, nil, nil)
+    sut = SrcLexer::Lexer.new(['A', 'B'], [','], nil, nil, nil)
     sut.analyze('A,B')
-    sut.pop_token.should == [:IDENT, SrcLexer::Token.new('A', 1, 1)]
+    sut.pop_token.should == ['A', SrcLexer::Token.new('A', 1, 1)]
     sut.pop_token.should == [',', SrcLexer::Token.new(',', 1, 2)]
-    sut.pop_token.should == [:IDENT, SrcLexer::Token.new('B', 1, 3)]
+    sut.pop_token.should == ['B', SrcLexer::Token.new('B', 1, 3)]
     sut.pop_token.should == SrcLexer::Lexer::END_TOKEN
   end
   it 'should reduce symbol duplication' do
