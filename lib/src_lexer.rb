@@ -18,6 +18,8 @@ module SrcLexer
 
   class Lexer
     END_TOKEN = [false, nil]
+    NUMBER_REGEX = /^[\d]+[\.]?[\d]*\z/
+    STRING_REGEX = /^\"(.*)\"\z/m
     attr_reader :keywords, :symbols, :line_comment_marker, :comment_markers, :tokens, :str
 
     def initialize(keywords, symbols, line_comment_marker, comment_marker)
@@ -34,39 +36,51 @@ module SrcLexer
 
     def pop_token
       token = @tokens.shift
-      if token.nil? then
-        return END_TOKEN
-      end
+      return END_TOKEN if token.nil?
       case token[0]
-      when /^[\d]+[\.]?[\d]*\z/
+      when NUMBER_REGEX
         [:NUMBER, Token.new(token[0], token[1], token[2])]
-      when /^\"(.*)\"\z/m
+      when STRING_REGEX
         [:STRING, Token.new(token[0], token[1], token[2])]
       else
-        id = is_reserved?(token[0]) ? token[0] : :IDENT
-        [id, Token.new(token[0], token[1], token[2])]
+        [is_reserved?(token[0]) ? token[0] : :IDENT, Token.new(token[0], token[1], token[2])]
       end
     end
 
     private
 
-    class StringIterator
-      attr_reader :index
+    class PosInfo
+      attr_accessor :index, :line_no, :char_no
+      
+      def initialize
+        @index = 0
+        @line_no = 1
+        @char_no = 1
+      end
+    end
 
+    class StringIterator
       def initialize(str)
         @str = str
-        @index = 0
-        @marked_pos = -1
+        @current_pos = PosInfo.new
+        @marked_pos = PosInfo.new
+        mark_clear()
+      end
+
+      def mark_clear
+        @marked_pos.index = -1
+        @marked_pos.line_no = 0
+        @marked_pos.char_no = 0
       end
 
       def mark_set
-        @marked_pos = @index
+        @marked_pos = @current_pos.clone
       end
 
       def is(target_string)
         return false if target_string.length.zero?
-        end_pos = (@index + target_string.length - 1)
-        @str[@index..end_pos] == target_string
+        end_pos = (@current_pos.index + target_string.length - 1)
+        @str[@current_pos.index..end_pos] == target_string
       end
 
       def is_in(target_list)
@@ -74,57 +88,51 @@ module SrcLexer
       end
 
       def move_next
-        @index += 1
+        if /\n/.match @str[@current_pos.index]
+          @current_pos.line_no += 1
+          @current_pos.char_no = 1
+        else
+          @current_pos.char_no += 1
+        end
+        @current_pos.index += 1
       end
 
       def move_to_the_end_of_the_line
-        @index += (@str[@index..-1] =~ /$/) - 1
+        char_count_to_the_end_of_the_line = (@str[@current_pos.index..-1] =~ /$/) - 1
+        @current_pos.index += char_count_to_the_end_of_the_line
+        @current_pos.char_no += char_count_to_the_end_of_the_line
       end
 
       def move_to(target)
-        esceped_target = Regexp.escape(target)
-        @index += (@str[@index..-1] =~ /#{esceped_target}/m) + target.length - 1
+        char_count_to_target = (@str[@current_pos.index..-1] =~ /#{Regexp.escape(target)}/m) + target.length - 1
+        chopped_string = @str[@current_pos.index..@current_pos.index + char_count_to_target]
+        @current_pos.index += char_count_to_target
+        match = /.*\n(.*)$/m.match(chopped_string)
+        p match[1].length if match
+        if match
+          @current_pos.char_no = match[1].length
+        else
+          @current_pos.char_no += char_count_to_target
+        end
+        @current_pos.line_no += chopped_string.each_char.select{|char| /\n/.match char}.length
       end
 
-      def [](range)
-        @str[range]
-      end
-
-      def <(pos)
-        @index < pos
-      end
-
-      def char
-        @str[@index]
+      def <(index)
+        @current_pos.index < index
       end
 
       def is_white_space
-        /[\s]/.match(char)
-      end
-
-      def info(pos)
-        [0, 0] if pos == 0
-        line_no, char_no = 1, 0
-        @str[0..pos].each_char do |char|
-          if /\n/.match(char)
-            line_no += 1
-            char_no = 0
-          else
-            char_no += 1
-          end
-        end
-        [line_no, char_no]
+        /\s/.match(@str[@current_pos.index])
       end
 
       def marked?
-        @marked_pos != -1
+        @marked_pos.index != -1
       end
 
       def shift
-        result = @str[@marked_pos..(@index - 1)]
-        line_no_and_char_no = info(@marked_pos) 
-        @marked_pos = -1
-        return result, *line_no_and_char_no
+        result = [@str[@marked_pos.index..(@current_pos.index - 1)], @marked_pos.line_no, @marked_pos.char_no]
+        mark_clear()
+        return result
       end
     end
 
@@ -135,12 +143,15 @@ module SrcLexer
       while iterator < @str.length do
         if iterator.is_white_space then
           @tokens.push iterator.shift if iterator.marked?
+          iterator.move_next
         elsif iterator.is(@line_comment_marker) then
           @tokens.push iterator.shift if iterator.marked?
           iterator.move_to_the_end_of_the_line
+          iterator.move_next
         elsif iterator.is(@comment_markers[0]) then
           @tokens.push iterator.shift if iterator.marked?
           iterator.move_to(@comment_markers[1])
+          iterator.move_next
         elsif iterator.is('"') then
           @tokens.push iterator.shift if iterator.marked?
           iterator.mark_set
@@ -148,18 +159,17 @@ module SrcLexer
           iterator.move_to('"')
           iterator.move_next
           @tokens.push iterator.shift
-          next
         elsif iterator.is_in(@symbols) then
           @tokens.push iterator.shift if iterator.marked?
-          symbol = @symbols.find { |symbol| iterator.is(symbol) }
-          @tokens.push [iterator[iterator.index..(iterator.index + symbol.length - 1)], *iterator.info(iterator.index)]
-          (symbol.length - 1).times { iterator.move_next }
+          iterator.mark_set
+          @symbols.find { |symbol| iterator.is(symbol) }.length.times { iterator.move_next }
+          @tokens.push iterator.shift
         elsif !iterator.marked? then
           iterator.mark_set
+        else
+          iterator.move_next
         end
-        iterator.move_next
       end
-
       @tokens.push iterator.shift if iterator.marked?
     end
 
